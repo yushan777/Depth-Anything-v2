@@ -201,13 +201,11 @@ python3 main.py \
     --input <your_image.png> \
     --output <output_depth.png> \
     --model depth_anything_v2_vitl_fp16.safetensors \
-    --models-dir /path/to/your/downloaded/models
 
 python3 main.py \
     --input input/woman-umbrella.jpg \
     --output output/woman-umbrella-depth.png \
     --model depth_anything_v2_vitl_fp16.safetensors \
-    --models-dir /path/to/your/downloaded/models
 
 
 Note: Depth Anything expects input image dims to be divisible by 14.
