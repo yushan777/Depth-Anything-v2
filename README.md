@@ -11,8 +11,8 @@ Follow these steps to set up the project environment and install dependencies.
 If you haven't already, clone the repository to your local machine:
 
 ```bash
-git clone <repository-url> # Replace <repository-url> with the actual URL
-cd depth-anythingv2 # Or your project directory name
+git clone https://github.com/yushan777/depth-anything-v2.git
+cd depth-anything-v2
 ```
 
 **2. Create a Python Virtual Environment**
@@ -20,7 +20,8 @@ cd depth-anythingv2 # Or your project directory name
 It's highly recommended to use a virtual environment to manage project dependencies.
 
 ```bash
-python3 -m venv venv # Or python -m venv venv
+python3 -m venv venv 
+# Or python -m venv venv
 ```
 *   This command creates a directory named `venv` in your project folder containing a dedicated Python installation.
 
