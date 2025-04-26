@@ -8,6 +8,8 @@ import numpy as np
 from huggingface_hub import hf_hub_download
 import time
 from safetensors.torch import load_file as load_safetensors # Import safetensors loading function
+import matplotlib.pyplot as plt  # Import matplotlib for colormap
+from matplotlib import cm  # Import colormap module
 
 # Assuming the depth_anything_v2 directory is in the same folder as main.py
 from depth_anything_v2.dpt import DepthAnythingV2
@@ -79,7 +81,7 @@ def load_model(model_name, device, models_dir='models'):
 
     return model, dtype, is_metric
 
-def process_image(model, image_path, output_path, device, dtype, is_metric):
+def process_image(model, image_path, output_dir, device, dtype, is_metric):
     """Processes a single image to estimate depth."""
     print(f"Processing image: {image_path}")
     try:
@@ -135,7 +137,7 @@ def process_image(model, image_path, output_path, device, dtype, is_metric):
     final_W = (orig_W // 2) * 2
     # Check shape using correct indices for 2D tensor
     if depth.ndim == 2 and (depth.shape[0] != final_H or depth.shape[1] != final_W):
-         # Interpolate expects NCHW, add N and C dims. Squeeze back to HW.
+         # Interpolate: expects NCHW, add N and C dims. Squeeze back to HW.
          depth = F.interpolate(depth.unsqueeze(0).unsqueeze(0), size=(final_H, final_W), mode="bilinear", align_corners=False).squeeze()
 
     depth = torch.clamp(depth, 0, 1)
@@ -152,16 +154,36 @@ def process_image(model, image_path, output_path, device, dtype, is_metric):
 
     # Save the output image
     try:
-        depth_image.save(output_path)
-        print(f"Depth map saved to: {output_path}")
+        # get just the input filename but with ext separate
+        name, ext = os.path.splitext(os.path.basename(image_path))
+        
+        # GRAYSCALE DEPTH MAP
+        # build the full grayscale_output_path
+        grayscale_output_path = f'{output_dir}/{name}_depth_gray{ext}'        
+        depth_image.save(grayscale_output_path)
+        print(f"Depth map saved to: {grayscale_output_path}")
+
+        # COLOR DEPTH MAP
+        # Apply colormap (Spectral_r to match original implementation)
+        cmap = cm.get_cmap('Spectral_r')
+        colored_depth = cmap(depth_np)[:, :, :3]  # Remove alpha channel
+        colored_depth = (colored_depth * 255).astype(np.uint8)        
+        # Convert to PIL image
+        colored_depth_image = Image.fromarray(colored_depth)        
+        # Save colored depth map
+        colored_output_path = f'{output_dir}/{name}_depth_color{ext}'
+        colored_depth_image.save(colored_output_path)
+        print(f"Colored depth map saved to: {colored_output_path}")
+
     except Exception as e:
         print(f"Error saving output image {output_path}: {e}")
 
 
+# ================================================================================
 def main():
     parser = argparse.ArgumentParser(description="Depth Anything V2 CLI Tool")
     parser.add_argument('--input', type=str, required=True, help='Path to the input image.')
-    parser.add_argument('--output', type=str, required=True, help='Path to save the output depth map.')
+    parser.add_argument('--output-dir', type=str, default='output', help='Dir to save the output depth map.')
     parser.add_argument('--model', type=str, default='depth_anything_v2_vitl_fp16.safetensors',
                         choices=AVAILABLE_MODELS, help='Name of the model to use.')
     parser.add_argument('--models-dir', type=str, default='models', help='Directory to store/load downloaded models.')
@@ -189,24 +211,26 @@ def main():
         return
 
     # Process image
-    process_image(model, args.input, args.output, device, dtype, is_metric)
+    process_image(model, args.input, args.output_dir, device, dtype, is_metric)
 
 if __name__ == "__main__":
     main()
 
 """
-example:
+Usage: 
+python3 main.py \
+    --input path/to/image.png \
+    --output-dir /path/to/saved/depthmaps \
+    --model depth_anything_v2_vitl_fp16.safetensors \
+    --models-dir /path/to/your/downloaded/models 
+
+Example:
 
 python3 main.py \
-    --input <your_image.png> \
-    --output <output_depth.png> \
-    --model depth_anything_v2_vitl_fp16.safetensors \
-
-python3 main.py \
-    --input input/woman-umbrella.jpg \
-    --output output/woman-umbrella-depth.png \
-    --model depth_anything_v2_vitl_fp16.safetensors \
-
+    --input 'input/bottle.png' \
+    --output-dir 'output' \
+    --model 'depth_anything_v2_vitl_fp32.safetensors' \
+    --models-dir 'models' 
 
 Note: Depth Anything expects input image dims to be divisible by 14.
 If not then it will be resized down to nearest divisible dim.  
