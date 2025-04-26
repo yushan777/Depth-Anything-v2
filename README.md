@@ -1,6 +1,6 @@
 # Depth Anything V2 Project
 
-This project utilizes the Depth Anything V2 model.
+This project utilizes the Depth Anything V2 model (safetensors formats)
 Original [repository](https://github.com/DepthAnything/Depth-Anything-V2).
 
 ## Installation
@@ -70,10 +70,10 @@ To run the model on an image:
 ```bash
 python main.py \
     --input path/to/your/image.jpg \
-    --output path/to/your/output_depth.png \
+    ----output-dir path/to/save/depth_maps \
     --model depth_anything_v2_vitl_fp32.safetensors
 ```
-*   Replace `path/to/your/image.jpg` and `path/to/your/output_depth.png` with your actual file paths.
+*   Replace `path/to/your/image.jpg` and `path/to/save/depth_maps` with your actual file and dir paths.
 *   Choose the desired model using the `--model` argument.
 *   The script will automatically attempt to use a GPU (CUDA or MPS) if available, falling back to CPU otherwise.
 
