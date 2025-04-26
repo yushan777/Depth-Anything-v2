@@ -1,6 +1,7 @@
 # Depth Anything V2 Project
 
 This project utilizes the Depth Anything V2 model.
+Original [repository](https://github.com/DepthAnything/Depth-Anything-V2).
 
 ## Installation
 
