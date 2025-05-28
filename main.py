@@ -54,7 +54,7 @@ def load_model(model_name, device, models_dir='models'):
         os.makedirs(models_dir, exist_ok=True)
         try:
             hf_hub_download(
-                repo_id="Kijai/DepthAnythingV2-safetensors",
+                repo_id="yushan777/DepthAnythingV2",
                 filename=model_name,
                 local_dir=models_dir,
                 local_dir_use_symlinks=False
