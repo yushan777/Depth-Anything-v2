@@ -32,6 +32,8 @@ def check_and_install_pytorch():
         print("Installing PyTorch for CUDA (cu126)...")
         # --- Updated command as requested ---
         command = [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio", "--extra-index-url", "https://download.pytorch.org/whl/cu126"]
+        print("Installing xformers...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "xformers"])
     elif is_apple_silicon:
         print("Installing standard PyTorch with MPS support...")
         command = [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio"]

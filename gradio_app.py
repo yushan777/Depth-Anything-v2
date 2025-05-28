@@ -1,14 +1,16 @@
+import gradio as gr
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
 import os
-import argparse
 from PIL import Image
 import numpy as np
 from huggingface_hub import hf_hub_download
 import time
 from safetensors.torch import load_file as load_safetensors # Import safetensors loading function
 import matplotlib as mpl # Import matplotlib for colormap
+# import matplotlib.pyplot as plt  # Import matplotlib for colormap (old)
+# from matplotlib import cm  # Import colormap module
 
 # Assuming the depth_anything_v2 directory is in the same folder as main.py
 from depth_anything_v2.dpt import DepthAnythingV2
@@ -32,7 +34,7 @@ AVAILABLE_MODELS = [
     'depth_anything_v2_metric_vkitti_vitl_fp32.safetensors'
 ]
 
-def load_model(model_name, device, models_dir='models'):
+def load_model(model_name, device, models_dir='models/depthanything'):
     """Loads the specified Depth Anything V2 model."""
     if model_name not in AVAILABLE_MODELS:
         raise ValueError(f"Model {model_name} not available. Choose from: {AVAILABLE_MODELS}")
@@ -80,22 +82,15 @@ def load_model(model_name, device, models_dir='models'):
 
     return model, dtype, is_metric
 
-def process_image(model, image_path, output_dir, device, dtype, is_metric):
+def process_image(model, image_tensor, device, dtype, is_metric):
     """Processes a single image to estimate depth."""
-    print(f"Processing image: {image_path}")
-    try:
-        image = Image.open(image_path).convert('RGB')
-    except Exception as e:
-        print(f"Error opening image {image_path}: {e}")
-        return
-
     # Preprocessing similar to the original node
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    # ])
 
-    image_tensor = transform(image).unsqueeze(0).to(device=device, dtype=dtype)
+    # image_tensor = transform(image).unsqueeze(0).to(device=device, dtype=dtype)
 
     # Ensure dimensions are divisible by 14
     orig_H, orig_W = image_tensor.shape[2:]
@@ -151,46 +146,17 @@ def process_image(model, image_path, output_dir, device, dtype, is_metric):
     # Create PIL image (grayscale)
     depth_image = Image.fromarray(depth_visual)
 
-    # Save the output image
-    try:
-        # get just the input filename but with ext separate
-        name, ext = os.path.splitext(os.path.basename(image_path))
-        
-        # GRAYSCALE DEPTH MAP
-        # build the full grayscale_output_path
-        grayscale_output_path = f'{output_dir}/{name}_depth_gray{ext}'        
-        depth_image.save(grayscale_output_path)
-        print(f"Depth map saved to: {grayscale_output_path}")
+    # COLOR DEPTH MAP
+    # Apply colormap (Spectral_r to match original implementation)
+    cmap = mpl.colormaps['Spectral_r']
+    colored_depth = cmap(depth_np)[:, :, :3]  # Remove alpha channel
+    colored_depth = (colored_depth * 255).astype(np.uint8)
+    # Convert to PIL image
+    colored_depth_image = Image.fromarray(colored_depth)
 
-        # COLOR DEPTH MAP
-        # Apply colormap (Spectral_r to match original implementation)
-        cmap = mpl.get_cmap('Spectral_r')
-        # cmap = cm.get_cmap('Spectral_r')
-        colored_depth = cmap(depth_np)[:, :, :3]  # Remove alpha channel
-        colored_depth = (colored_depth * 255).astype(np.uint8)
-        # Convert to PIL image
-        colored_depth_image = Image.fromarray(colored_depth)
-        # Save colored depth map
-        colored_output_path = f'{output_dir}/{name}_depth_color{ext}'
-        colored_depth_image.save(colored_output_path)
-        print(f"Colored depth map saved to: {colored_output_path}")
+    return depth_image, colored_depth_image
 
-    except Exception as e:
-        print(f"Error saving output image {grayscale_output_path} and {colored_output_path}: {e}")
-
-
-# ================================================================================
-def main():
-    parser = argparse.ArgumentParser(description="Depth Anything V2 CLI Tool")
-    parser.add_argument('--input', type=str, required=True, help='Path to the input image.')
-    parser.add_argument('--output-dir', type=str, default='output', help='Dir to save the output depth map.')
-    parser.add_argument('--model', type=str, default='depth_anything_v2_vitl_fp16.safetensors',
-                        choices=AVAILABLE_MODELS, help='Name of the model to use.')
-    parser.add_argument('--models-dir', type=str, default='models', help='Directory to store/load downloaded models.')
-    # --gpu flag removed, GPU is now default if available
-
-    args = parser.parse_args()
-
+def generate_depth_maps(input_image, model_name):
     # Determine device (Default to GPU if available, fallback to CPU)
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -202,37 +168,40 @@ def main():
         device = torch.device("cpu")
         print("No GPU detected or available. Using CPU.")
 
-
     # Load model
     try:
-        model, dtype, is_metric = load_model(args.model, device, args.models_dir)
+        model, dtype, is_metric = load_model(model_name, device)
     except Exception as e:
         print(f"Failed to load model: {e}")
-        return
+        return None, None
+
+    # Preprocessing
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    image_tensor = transform(input_image).unsqueeze(0).to(device=device, dtype=dtype)
 
     # Process image
-    process_image(model, args.input, args.output_dir, device, dtype, is_metric)
+    try:
+        depth_image, colored_depth_image = process_image(model, image_tensor, device, dtype, is_metric)
+        return depth_image, colored_depth_image
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        return None, None
+
+iface = gr.Interface(
+    fn=generate_depth_maps,
+    inputs=[
+        gr.Image(type="pil", label="Input Image"),
+        gr.Dropdown(choices=AVAILABLE_MODELS, label="Select Model", value='depth_anything_v2_vitl_fp16.safetensors')
+    ],
+    outputs=[
+        gr.Image(type="pil", label="Grayscale Depth Map"),
+        gr.Image(type="pil", label="Color Depth Map")
+    ],
+    title="Depth Anything V2 Gradio Demo"
+)
 
 if __name__ == "__main__":
-    main()
-
-"""
-Usage: 
-python3 main.py \
-    --input path/to/image.png \
-    --output-dir /path/to/saved/depthmaps \
-    --model depth_anything_v2_vitl_fp16.safetensors \
-    --models-dir /path/to/your/downloaded/models 
-
-Example:
-
-python3 main.py \
-    --input 'input/bottle.png' \
-    --output-dir 'output' \
-    --model 'depth_anything_v2_vitl_fp32.safetensors' \
-    --models-dir 'models' 
-
-Note: Depth Anything expects input image dims to be divisible by 14.
-If not then it will be resized down to nearest divisible dim.  
-Final depthmap image will match original size
-"""
+    iface.launch()
