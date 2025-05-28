@@ -78,11 +78,3 @@ python main.py \
 *   The script will automatically attempt to use a GPU (CUDA or MPS) if available, falling back to CPU otherwise.
 
 **6. Deactivate the Virtual Environment (When Done)**
-
-When you're finished working on the project, you can deactivate the environment:
-
-```bash
-deactivate
-```
-
-You should now have all the necessary dependencies installed to run the project.
