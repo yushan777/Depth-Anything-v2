@@ -82,7 +82,7 @@ def load_model(model_name, device, models_dir='models/depthanything'):
 
     return model, dtype, is_metric
 
-def process_image(model, image_tensor, device, dtype, is_metric):
+def process_image(model, image_tensor, device, dtype, is_metric, output_filename_base):
     """Processes a single image to estimate depth."""
     # Preprocessing similar to the original node
     # transform = transforms.Compose([
@@ -154,6 +154,20 @@ def process_image(model, image_tensor, device, dtype, is_metric):
     # Convert to PIL image
     colored_depth_image = Image.fromarray(colored_depth)
 
+    # save the image(s) into the output directory before returning
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save grayscale depth map
+    grayscale_path = os.path.join(output_dir, f"{output_filename_base}_depth.png")
+    depth_image.save(grayscale_path)
+    print(f"Saved grayscale depth map to: {grayscale_path}")
+    
+    # Save colored depth map
+    colored_path = os.path.join(output_dir, f"{output_filename_base}_depth_colored.png")
+    colored_depth_image.save(colored_path)
+    print(f"Saved colored depth map to: {colored_path}")
+    
     return depth_image, colored_depth_image
 
 def generate_depth_maps(input_image, model_name):
@@ -182,9 +196,14 @@ def generate_depth_maps(input_image, model_name):
     ])
     image_tensor = transform(input_image).unsqueeze(0).to(device=device, dtype=dtype)
 
+    # Generate output filename base (use timestamp since Gradio doesn't provide original filename)
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename_base = f"gradio_image_{timestamp}"
+    
     # Process image
     try:
-        depth_image, colored_depth_image = process_image(model, image_tensor, device, dtype, is_metric)
+        depth_image, colored_depth_image = process_image(model, image_tensor, device, dtype, is_metric, output_filename_base)
         return depth_image, colored_depth_image
     except Exception as e:
         print(f"Error processing image: {e}")
